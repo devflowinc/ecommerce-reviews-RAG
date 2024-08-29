@@ -9,6 +9,7 @@ This is a vanilla JavaScript demo for what could be a configurable component tha
 - suggested related questions
 - a display of the most relevant reviews related to the user's question
 
+<img width="1912" alt="image" src="https://github.com/user-attachments/assets/deecdd5f-394c-4ec3-bdda-16849bfac407">
 
 The initial message is a generated summary of 30 reviews of the product. Here we simply sorted by the `up_vote_count` minus the `down_vote_count`. In the demo, the summary is drawn from a cached value, but you can regenerate it on a different prompt in the userscript or generate the cached values for the three demo products in a sample test script. We used OpenAI's 4o model to generate the summary and you can see the prompt we used in the script. The initial suggested questions are also pre-generated, but each user query will generate *new* suggestions based on the current set of reviews.
 
