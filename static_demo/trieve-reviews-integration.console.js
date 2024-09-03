@@ -1,14 +1,3 @@
-// ==UserScript==
-// @name         Trieve Reviews Integration
-// @namespace    http://tampermonkey.net/
-// @version      0.1
-// @description  Integrate Trieve API on target website
-// @match        https://www.tecovas.com/products/the-jamie*
-// @match        https://www.tecovas.com/products/the-annie*
-// @match        https://www.tecovas.com/products/the-doc*
-// @grant        GM_xmlhttpRequest
-// ==/UserScript==
-
 const TRIEVE_API_KEY = "tr-T56YLuF2LSYHkDa7jzSifekxurW7iDDY";
 const TRIEVE_DATASET_ID = "c8a3adf2-2ff2-4382-8745-c4b2dd2e7340";
 
@@ -122,6 +111,8 @@ async function generateSuggestedQueries({
 }) {
   const productName = getProductName(productId);
   let suggestedQueries;
+  if (typeof window === "undefined") {
+  }
   try {
     if (
       usePreGeneratedSuggestions &&
@@ -153,28 +144,30 @@ async function searchCall(query, productId = getProductId()) {
   const requestBody = {
     query: query,
     search_type: "semantic",
-    page_size: 30, // Adjust as needed
+    page_size: 30,
     filters: getFilterOnProductId(productId),
   };
-  return new Promise((resolve, reject) => {
-    GM_xmlhttpRequest({
+
+  try {
+    const response = await fetch("https://api.trieve.ai/api/chunk/search", {
       method: "POST",
-      url: "https://api.trieve.ai/api/chunk/search",
       headers: {
         Authorization: `Bearer ${TRIEVE_API_KEY}`,
         "TR-Dataset": TRIEVE_DATASET_ID,
         "Content-Type": "application/json",
       },
-      data: JSON.stringify(requestBody),
-      onload: function (response) {
-        resolve(JSON.parse(response.responseText));
-      },
-      onerror: function (error) {
-        reject(error);
-        console.error("Error in Trieve API request (searchCall):", error);
-      },
+      body: JSON.stringify(requestBody),
     });
-  });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error in Trieve API request (searchCall):", error);
+    throw error;
+  }
 }
 
 async function generateSuggestedQueriesCall({
@@ -193,6 +186,8 @@ async function generateSuggestedQueriesCall({
     chunkTrackingIds = searchResults.chunks.map(
       (chunk) => chunk.chunk.tracking_id
     );
+    if (typeof window === "undefined") {
+    }
   }
   const context = `questions shoppers can ask an AI trained specifically on product reviews for: "${productName}"`;
   const requestBody = {
@@ -209,53 +204,50 @@ async function generateSuggestedQueriesCall({
     },
     context: context,
   };
-  return new Promise((resolve, reject) => {
-    GM_xmlhttpRequest({
-      method: "POST",
-      url: "https://api.trieve.ai/api/chunk/suggestions",
-      headers: {
-        Authorization: `Bearer ${TRIEVE_API_KEY}`,
-        "TR-Dataset": TRIEVE_DATASET_ID,
-        "Content-Type": "application/json",
-      },
-      data: JSON.stringify(requestBody),
-      onload: function (response) {
-        try {
-          const data = JSON.parse(response.responseText);
-          if (!Array.isArray(data.queries)) {
-            reject(new Error("Invalid response structure"));
-            return;
-          }
 
-          const randomSuggestions = [];
-          const randomNumbers = [];
+  try {
+    const response = await fetch(
+      "https://api.trieve.ai/api/chunk/suggestions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${TRIEVE_API_KEY}`,
+          "TR-Dataset": TRIEVE_DATASET_ID,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      }
+    );
 
-          while (
-            randomNumbers.length < count &&
-            randomNumbers.length < data.queries.length
-          ) {
-            const randNum = Math.floor(Math.random() * data.queries.length);
-            if (!randomNumbers.includes(randNum)) {
-              randomNumbers.push(randNum);
-            }
-          }
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
-          randomNumbers.forEach((num) =>
-            randomSuggestions.push(data.queries[num])
-          );
+    const data = await response.json();
+    if (!Array.isArray(data.queries)) {
+      throw new Error("Invalid response structure");
+    }
 
-          resolve(randomSuggestions);
-        } catch (error) {
-          console.error("Error processing response:", error);
-          reject(error);
-        }
-      },
-      onerror: function (error) {
-        console.error("Error in generateSuggestedQueriesCall:", error);
-        reject(error);
-      },
-    });
-  });
+    const randomSuggestions = [];
+    const randomNumbers = [];
+
+    while (
+      randomNumbers.length < count &&
+      randomNumbers.length < data.queries.length
+    ) {
+      const randNum = Math.floor(Math.random() * data.queries.length);
+      if (!randomNumbers.includes(randNum)) {
+        randomNumbers.push(randNum);
+      }
+    }
+
+    randomNumbers.forEach((num) => randomSuggestions.push(data.queries[num]));
+
+    return randomSuggestions;
+  } catch (error) {
+    console.error("Error in generateSuggestedQueriesCall:", error);
+    throw error;
+  }
 }
 
 async function getSummaryOfReviews({
@@ -287,39 +279,38 @@ async function getSummaryOfReviews({
 }
 
 async function scrollForChunksCall(productId) {
-  return new Promise((resolve, reject) => {
-    const requestBody = {
-      page_size: 30,
-      sort_by: {
-        field: "num_value",
-        direction: "desc",
-      },
-      filters: getFilterOnProductId(productId),
-      offset_chunk_id: null,
-      prefetch_amount: null,
-    };
-    GM_xmlhttpRequest({
+  const requestBody = {
+    page_size: 30,
+    sort_by: {
+      field: "num_value",
+      direction: "desc",
+    },
+    filters: getFilterOnProductId(productId),
+    offset_chunk_id: null,
+    prefetch_amount: null,
+  };
+
+  try {
+    const response = await fetch("https://api.trieve.ai/api/chunks/scroll", {
       method: "POST",
-      url: "https://api.trieve.ai/api/chunks/scroll",
       headers: {
         Authorization: `Bearer ${TRIEVE_API_KEY}`,
         "TR-Dataset": TRIEVE_DATASET_ID,
         "Content-Type": "application/json",
       },
-      data: JSON.stringify(requestBody),
-      onload: function (response) {
-        const result = JSON.parse(response.responseText);
-        resolve(result.chunks);
-      },
-      onerror: function (error) {
-        console.error(
-          "Error in Trieve API request (scrollForChunksCall):",
-          error
-        );
-        reject(error);
-      },
+      body: JSON.stringify(requestBody),
     });
-  });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return result.chunks;
+  } catch (error) {
+    console.error("Error in Trieve API request (scrollForChunksCall):", error);
+    throw error;
+  }
 }
 
 async function generateSummaryCall(chunks, productId = getProductId()) {
@@ -329,16 +320,15 @@ async function generateSummaryCall(chunks, productId = getProductId()) {
     highlighting common praises, criticisms, and overall sentiment. 
     Keep the summary concise, around 3-4 sentences.`;
 
-  return new Promise((resolve, reject) => {
-    GM_xmlhttpRequest({
+  try {
+    const response = await fetch("https://api.trieve.ai/api/chunk/generate", {
       method: "POST",
-      url: "https://api.trieve.ai/api/chunk/generate",
       headers: {
         Authorization: `Bearer ${TRIEVE_API_KEY}`,
         "TR-Dataset": TRIEVE_DATASET_ID,
         "Content-Type": "application/json",
       },
-      data: JSON.stringify({
+      body: JSON.stringify({
         chunk_ids: chunkIds,
         prompt: prompt,
         prev_messages: [
@@ -348,14 +338,17 @@ async function generateSummaryCall(chunks, productId = getProductId()) {
           },
         ],
       }),
-      onload: function (response) {
-        resolve(response.responseText);
-      },
-      onerror: function (error) {
-        reject(error);
-      },
     });
-  });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.text();
+  } catch (error) {
+    console.error("Error in generateSummaryCall:", error);
+    throw error;
+  }
 }
 
 function updateReviewSummary(summaryText) {
@@ -401,27 +394,29 @@ async function createTopicAndMessage(userMessage, productId = getProductId()) {
 }
 
 async function createTopicCall(firstUserMessage) {
-  return new Promise((resolve, reject) => {
-    GM_xmlhttpRequest({
+  try {
+    const response = await fetch("https://api.trieve.ai/api/topic", {
       method: "POST",
-      url: "https://api.trieve.ai/api/topic",
       headers: {
         Authorization: `Bearer ${TRIEVE_API_KEY}`,
         "TR-Dataset": TRIEVE_DATASET_ID,
         "Content-Type": "application/json",
       },
-      data: JSON.stringify({
+      body: JSON.stringify({
         owner_id: "2534865987698769876",
         first_user_message: firstUserMessage,
       }),
-      onload: function (response) {
-        resolve(JSON.parse(response.responseText));
-      },
-      onerror: function (error) {
-        reject(error);
-      },
     });
-  });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error in createTopicCall:", error);
+    throw error;
+  }
 }
 
 async function createMessageCall(
@@ -458,155 +453,133 @@ Maintain a neutral tone, avoid making recommendations, and stick to summarizing 
   return createMessageCallBrowser(requestBody, messageContent);
 }
 
-function createMessageCallServer(requestBody) {
-  return new Promise((resolve, reject) => {
-    GM_xmlhttpRequest({
+async function createMessageCallServer(requestBody) {
+  try {
+    const response = await fetch("https://api.trieve.ai/api/message", {
       method: "POST",
-      url: "https://api.trieve.ai/api/message",
       headers: {
         Authorization: `Bearer ${TRIEVE_API_KEY}`,
         "TR-Dataset": TRIEVE_DATASET_ID,
         "Content-Type": "application/json",
       },
-      data: JSON.stringify(requestBody),
-      onload: function (response) {
-        try {
-          resolve(response.response);
-        } catch (error) {
-          console.error("Error parsing JSON response:", error);
-
-          reject(new Error("Invalid JSON response from API"));
-        }
-      },
-      onerror: function (error) {
-        console.error("Error in Trieve API request (createMessage):", error);
-        reject(error);
-      },
+      body: JSON.stringify(requestBody),
     });
-  });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error in createMessageCallServer:", error);
+    throw error;
+  }
 }
 
-function createMessageCallBrowser(requestBody, messageContent) {
-  return new Promise((resolve, reject) => {
-    let externalTimeoutId = setTimeout(() => {
-      reject(new Error("Response timeout"));
+async function createMessageCallBrowser(requestBody, messageContent) {
+  try {
+    const response = await fetch("https://api.trieve.ai/api/message", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${TRIEVE_API_KEY}`,
+        "TR-Dataset": TRIEVE_DATASET_ID,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let aiResponse = "";
+    let isResolved = false;
+    let chunkDataString = "";
+
+    const externalTimeoutId = setTimeout(() => {
+      if (!isResolved) {
+        isResolved = true;
+        reject(new Error("Response timeout"));
+      }
     }, 10000);
 
-    GM_xmlhttpRequest({
-      method: "POST",
-      url: "https://api.trieve.ai/api/message",
-      headers: {
-        Authorization: `Bearer ${TRIEVE_API_KEY}`,
-        "TR-Dataset": TRIEVE_DATASET_ID,
-        "Content-Type": "application/json",
-      },
-      data: JSON.stringify(requestBody),
-      responseType: "stream",
-      onloadstart: handleStreamResponse(
-        externalTimeoutId,
-        messageContent,
-        resolve,
-        reject
-      ),
-      onerror: handleCreateMessageError(externalTimeoutId, reject),
-    });
-  });
-}
-
-function handleStreamResponse(
-  externalTimeoutId,
-  messageContent,
-  resolve,
-  reject
-) {
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let aiResponse = "";
-  let isResolved = false;
-  let chunkDataString = "";
-
-  function finalizeResponse() {
-    clearTimeout(externalTimeoutId);
-    if (buffer.length > 0) {
-      console.error("Unexpected buffer content at end of response:", buffer);
-    }
-    if (!isResolved) {
-      isResolved = true;
-      resolve(aiResponse);
-    }
-  }
-
-  function handleChunkError(error) {
-    console.error("Error reading chunk:", error);
-    clearTimeout(externalTimeoutId);
-    if (!isResolved) {
-      isResolved = true;
-      reject(error);
-    }
-  }
-
-  function processChunkData(chunkDataString) {
-    if (chunkDataString.length > 0) {
-      try {
-        const results = JSON.parse(chunkDataString);
-        if (results.length == 30) {
-          displaySearchResults(results, messageContent);
-          finalizeResponse();
-        }
-      } catch (error) {
-        // continue, errors are expected when the response is incomplete
+    const handleChunkError = (error) => {
+      console.error("Error reading chunk:", error);
+      clearTimeout(externalTimeoutId);
+      if (!isResolved) {
+        isResolved = true;
+        reject(error);
       }
-    }
-  }
+    };
 
-  function processBuffer() {
-    let separatorIndex;
-    if ((separatorIndex = buffer.indexOf('||[{"id"')) !== -1) {
-      // Extract all content after the separator
-      // This ensures we capture the entire chunk of data
-      // that follows the '||' delimiter
-      const [bufferBeforeSeparator, bufferAfterSeparator] = buffer.split(
-        '||[{"id"',
-        2
-      );
-      buffer = bufferBeforeSeparator;
-      chunkDataString = '[{"id"' + bufferAfterSeparator;
-    } else if (chunkDataString.length > 0) {
-      chunkDataString += buffer;
-      buffer = "";
-    }
-    processChunkData(chunkDataString);
-    // all buffer content before separator is processed
-    if (buffer.length > 0) {
-      aiResponse += buffer;
-      updateAIResponse(aiResponse);
-      buffer = "";
-    }
-  }
-
-  return function (response) {
-    const reader = response.response.getReader();
-    reader
-      .read()
-      .then(function pump({ done, value }) {
-        if (done) {
-          finalizeResponse();
-          return;
+    const processChunkData = (chunkDataString) => {
+      if (chunkDataString.length > 0) {
+        try {
+          const results = JSON.parse(chunkDataString);
+          if (results.length == 30) {
+            displaySearchResults(results, messageContent);
+            finalizeResponse();
+          }
+        } catch (error) {
+          // continue, errors are expected when the response is incomplete
         }
-        buffer += decoder.decode(value, { stream: true });
-        processBuffer();
-        return reader.read().then(pump);
-      })
-      .catch(handleChunkError);
-  };
-}
+      }
+    };
 
-function handleCreateMessageError(externalTimeoutId, reject) {
-  return function (error) {
-    console.error("Error in Trieve API request (createMessage):", error);
-    clearTimeout(externalTimeoutId);
-    reject(error);
-  };
+    const processBuffer = () => {
+      let separatorIndex;
+      if ((separatorIndex = buffer.indexOf('||[{"id"')) !== -1) {
+        // Extract all content after the separator
+        // This ensures we capture the entire chunk of data
+        // that follows the '||' delimiter
+        const [bufferBeforeSeparator, bufferAfterSeparator] = buffer.split(
+          '||[{"id"',
+          2
+        );
+        buffer = bufferBeforeSeparator;
+        chunkDataString = '[{"id"' + bufferAfterSeparator;
+      } else if (chunkDataString.length > 0) {
+        chunkDataString += buffer;
+        buffer = "";
+      }
+      processChunkData(chunkDataString);
+      // all buffer content before separator is processed
+      if (buffer.length > 0) {
+        aiResponse += buffer;
+        updateAIResponse(aiResponse);
+        buffer = "";
+      }
+    };
+
+    const finalizeResponse = () => {
+      clearTimeout(externalTimeoutId);
+      if (buffer.length > 0) {
+        console.error("Unexpected buffer content at end of response:", buffer);
+      }
+      if (!isResolved) {
+        isResolved = true;
+        resolve(aiResponse);
+      }
+    };
+
+    const pump = async ({ done, value }) => {
+      if (done) {
+        finalizeResponse();
+        return;
+      }
+      buffer += decoder.decode(value, { stream: true });
+      processBuffer();
+      return reader.read().then(pump).catch(handleChunkError);
+    };
+
+    reader.read().then(pump).catch(handleChunkError);
+  } catch (error) {
+    console.error("Error in createMessageCallBrowser:", error);
+    throw error;
+  }
 }
 
 function getBreadcrumbsContent() {
@@ -1233,23 +1206,4 @@ function insertTrieveComponent() {
   );
 }
 
-//////////////////////////////////////////////////////
-// Core Tampermonkey script
-(function () {
-  "use strict";
-
-  // Execute the insertion
-  function waitForDOM() {
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", insertTrieveComponent);
-    } else {
-      insertTrieveComponent();
-    }
-  }
-
-  // Start the process
-  if (typeof window !== "undefined") {
-    // Start the process
-    waitForDOM();
-  }
-})();
+insertTrieveComponent();
