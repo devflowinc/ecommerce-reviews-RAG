@@ -1,6 +1,6 @@
 # ECommerce Customer Reviews RAG
 
-This repo contains an Open Source version of Amazon Rufus, an AI chat UX over customer reviews! We are excited about the potential UX and looking to help make it more ubiquitous.
+This repo contains an Open Source version of Amazon Rufus, an AI chat UX over customer reviews! We are excited about the potential UX and looking to help make it more ubiquitous. See the live demo at [review-rag.trieve.ai](https://review-rag.trieve.ai/) or watch a [video of it in action here](https://www.loom.com/share/94d432aead0542a398b14cdb636e6b9b?sid=35c4e25b-89e9-4634-b82b-624b46ebf2fe).
 
 ## Overview
 
