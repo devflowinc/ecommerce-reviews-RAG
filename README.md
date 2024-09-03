@@ -1,4 +1,6 @@
-# Junip + Trieve Demo
+# ECommerce Customer Reviews RAG
+
+This repo contains an Open Source version of Amazon Rufus, an AI chat UX over customer reviews! We are excited about the potential UX and looking to help make it more ubiquitous.
 
 ## Overview
 
@@ -18,7 +20,7 @@ The chat response is RAG here, retrieval augmented generation, so for this we co
 
 ## Demo video
 
-On Loom: [Junip + Trieve Demo](https://www.loom.com/share/94d432aead0542a398b14cdb636e6b9b?sid=35c4e25b-89e9-4634-b82b-624b46ebf2fe)
+On Loom: [ECommerce Customer Reviews RAG Live Demo](https://www.loom.com/share/94d432aead0542a398b14cdb636e6b9b?sid=35c4e25b-89e9-4634-b82b-624b46ebf2fe)
 
 ## Running the userscript
 
